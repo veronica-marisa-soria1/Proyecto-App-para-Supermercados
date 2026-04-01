@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "Supermarket": {
+      "title": "Supermarket",
+      "description": "A local supermarket in Chaco.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "address", "ownerId"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A product sold by a supermarket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "supermarketId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "stock": { "type": "integer" }
+      },
+      "required": ["supermarketId", "name", "price"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "A daily, weekly, or monthly offer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "supermarketId": { "type": "string" },
+        "productId": { "type": "string" },
+        "discountedPrice": { "type": "number" },
+        "type": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["supermarketId", "productId", "discountedPrice", "type"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "supermarketId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "preparing", "ready", "delivered", "cancelled"] },
+        "deliveryType": { "type": "string", "enum": ["pickup", "home_delivery"] },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "supermarketId", "items", "total", "status", "deliveryType"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "owner", "admin"] },
+        "address": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/supermarkets/{supermarketId}": {
+      "schema": "Supermarket",
+      "description": "Collection of supermarkets."
+    },
+    "/supermarkets/{supermarketId}/products/{productId}": {
+      "schema": "Product",
+      "description": "Products for a specific supermarket."
+    },
+    "/supermarkets/{supermarketId}/offers/{offerId}": {
+      "schema": "Offer",
+      "description": "Offers for a specific supermarket."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    }
+  }
+}

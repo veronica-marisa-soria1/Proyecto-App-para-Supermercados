@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: supermarkets
+    // Document ID: supermarketId
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - address: string (required, 1-200 chars)
+    //   - phone: string (optional, 1-20 chars)
+    //   - logoUrl: string (optional, URL)
+    //   - description: string (optional, 1-500 chars)
+    //   - ownerId: string (required, UID)
+    //
+    // Collection: supermarkets/{supermarketId}/products
+    // Document ID: productId
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - description: string (optional, 1-500 chars)
+    //   - price: number (required, positive)
+    //   - category: string (optional, 1-50 chars)
+    //   - imageUrl: string (optional, URL)
+    //   - stock: int (optional, positive)
+    //
+    // Collection: supermarkets/{supermarketId}/offers
+    // Document ID: offerId
+    // Fields:
+    //   - productId: string (required, productId)
+    //   - discountedPrice: number (required, positive)
+    //   - type: string (required, enum: daily, weekly, monthly)
+    //   - startDate: string (optional, ISO8601)
+    //   - endDate: string (optional, ISO8601)
+    //
+    // Collection: orders
+    // Document ID: orderId
+    // Fields:
+    //   - userId: string (required, UID)
+    //   - supermarketId: string (required, supermarketId)
+    //   - items: list (required, max 50 items)
+    //   - total: number (required, positive)
+    //   - status: string (required, enum: pending, preparing, ready, delivered, cancelled)
+    //   - deliveryType: string (required, enum: pickup, home_delivery)
+    //   - address: string (optional, 1-200 chars)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - uid: string (required, UID)
+    //   - email: string (required, email)
+    //   - displayName: string (optional, 1-100 chars)
+    //   - role: string (required, enum: customer, owner, admin)
+    //   - address: string (optional, 1-200 chars)
+    //   - phone: string (optional, 1-20 chars)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "soriav449veronica@gmail.com" && request.auth.token.email_verified == true));
+    }
+    function isSupermarketOwner(supermarketId) {
+      return isAuthenticated() && get(/databases/$(database)/documents/supermarkets/$(supermarketId)).data.ownerId == request.auth.uid;
+    }
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid == userId &&
+               data.email is string && isValidEmail(data.email) &&
+               data.role in ['customer', 'owner', 'admin'] &&
+               (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+               (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
+               (!('phone' in data) || (data.phone is string && data.phone.size() <= 20));
+      }
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'customer';
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && 
+                      (isAdmin() || request.resource.data.role == resource.data.role);
+    }
+
+    match /supermarkets/{supermarketId} {
+      function isValidSupermarket(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+               data.address is string && data.address.size() > 0 && data.address.size() <= 200 &&
+               data.ownerId is string &&
+               (!('phone' in data) || (data.phone is string && data.phone.size() <= 20)) &&
+               (!('logoUrl' in data) || isValidUrl(data.logoUrl)) &&
+               (!('description' in data) || (data.description is string && data.description.size() <= 500));
+      }
+      allow read: if true; // Publicly readable
+      allow create: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner') &&
+                      isValidSupermarket(request.resource.data) && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.ownerId) &&
+                      isValidSupermarket(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isAdmin();
+
+      match /products/{productId} {
+        function isValidProduct(data) {
+          return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+                 data.price is number && data.price > 0 &&
+                 (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+                 (!('category' in data) || (data.category is string && data.category.size() <= 50)) &&
+                 (!('imageUrl' in data) || isValidUrl(data.imageUrl)) &&
+                 (!('stock' in data) || (data.stock is int && data.stock >= 0));
+        }
+        allow read: if true;
+        allow write: if isSupermarketOwner(supermarketId) || isAdmin();
+      }
+
+      match /offers/{offerId} {
+        function isValidOffer(data) {
+          return data.productId is string &&
+                 data.discountedPrice is number && data.discountedPrice > 0 &&
+                 data.type in ['daily', 'weekly', 'monthly'];
+        }
+        allow read: if true;
+        allow write: if isSupermarketOwner(supermarketId) || isAdmin();
+      }
+    }
+
+    match /orders/{orderId} {
+      function isValidOrder(data) {
+        return data.userId == request.auth.uid &&
+               data.supermarketId is string &&
+               data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+               data.total is number && data.total > 0 &&
+               data.status in ['pending', 'preparing', 'ready', 'delivered', 'cancelled'] &&
+               data.deliveryType in ['pickup', 'home_delivery'] &&
+               (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
+               data.createdAt is timestamp;
+      }
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isSupermarketOwner(resource.data.supermarketId) || isAdmin());
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && (
+                      (request.auth.uid == resource.data.userId && request.resource.data.status == 'cancelled' && resource.data.status == 'pending') ||
+                      (isSupermarketOwner(resource.data.supermarketId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+                      isAdmin()
+                    );
+    }
+  }
+}

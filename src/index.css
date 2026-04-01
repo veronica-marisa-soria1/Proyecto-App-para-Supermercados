@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-chaco-green: #009B3A;
+  --color-chaco-blue: #75AADB;
+  --color-chaco-gold: #FFD700;
+  
+  --color-primary: var(--color-chaco-green);
+  --color-secondary: var(--color-chaco-blue);
+  --color-accent: var(--color-chaco-gold);
+}

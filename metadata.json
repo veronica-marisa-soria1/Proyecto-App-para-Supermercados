@@ -1,0 +1,5 @@
+{
+  "name": "Chaco Market",
+  "description": "Marketplace para supermercados de Chaco, Argentina. Ofertas diarias, semanales y mensuales con opciones de retiro o entrega a domicilio.",
+  "requestFramePermissions": ["geolocation"]
+}
